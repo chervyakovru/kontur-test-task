@@ -30,37 +30,46 @@ const getFeedbackByProductViewData = async (product, actualize = false) => {
   }
 
   const usersId = new Set();
-  console.log("response.data.feedback: ", response.data.feedback);
-
   response.data.feedback.map(el => {
     usersId.add(el.userId);
   });
 
-  const users = await axios.get("/users", {
-    params: {
-      ids: [...usersId]
-    }
+  let users;
+  try {
+    users = await axios.get("/users", {
+      params: {
+        ids: [...usersId]
+      }
+    });
+  } catch (error) {
+    return error.response.data;
+  }
+
+  const sortedFeedback = response.data.feedback.sort((a, b) => {
+    return b.date - a.date;
   });
 
   const usersMap = getUsersMap(users.data.users);
+  const encounterIds = new Set();
 
-  let sortedFeedback = response.data.feedback;
-  sortedFeedback.sort(function(a, b) {
-    return a.date - b.date;
-  });
-
-  console.log("sortedFeedback: ", sortedFeedback);
-
-  const feedbackData = sortedFeedback.map(el => {
-    const feedback = {
+  const feedback = sortedFeedback.reduce((acc, el) => {
+    if (actualize) {
+      if (encounterIds.has(el.userId)) {
+        return acc;
+      }
+      encounterIds.add(el.userId);
+    }
+    const review = {
       message: el.message,
       date: formatedDate(el.date),
       user: usersMap[el.userId]
     };
-    return feedback;
-  });
+    return [...acc, review];
+  }, []);
 
-  return feedbackData;
+  feedback.reverse();
+
+  return { feedback };
 };
 
 module.exports = { getFeedbackByProductViewData };
